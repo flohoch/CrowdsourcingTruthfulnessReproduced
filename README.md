@@ -1,4 +1,4 @@
-# CrowdsourcingTruthfulness
+# Crowdsourcing Truthfulness Reproduced
 Reproduction of the of a research paper.
 
 This repo contains the reproduced code of the paper below.
