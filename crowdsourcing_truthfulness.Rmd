@@ -1,0 +1,512 @@
+---
+title: "exp"
+author: "Hochreiter et al.r"
+date: "24 1 2021"
+output: html_document
+---
+Imports:
+```{r}
+library(ggplot2)
+library(dplyr)
+```
+
+# Loading the data
+The data set contains more data than the paper actually treat. We just need the row where rel is 'LIE', 'FALSE', 'BARELYTRUE', 'HALFTRUE', 'MOSTLYTRUE' and 'TRUE'
+```{r}
+s6 = read.csv("s6_Data.csv")
+s100 = read.csv("s100_Data.csv")
+
+s6_small = filter(s6,rel =='LIE' | rel =='FALSE'| rel =='BARELYTRUE' | rel =='HALFTRUE' | rel =='MOSTLYTRUE' | rel=='TRUE')
+s6_small$rel = as.factor(s6_small$rel)
+
+s100_small = filter(s100,rel =='LIE' | rel =='FALSE'| rel =='BARELYTRUE' | rel =='HALFTRUE' | rel =='MOSTLYTRUE' | rel=='TRUE')
+s100_small$rel = as.factor(s100_small$rel)
+```
+
+
+# Individual score distributions
+
+
+```{r}
+ggplot() +
+  geom_bar(
+    data = as.data.frame(table(s6_small$S6_rel)),
+    aes(x = Var1, y = Freq),
+    stat = "identity",
+    color = "black",
+    fill = "skyblue",
+    alpha = 0.9
+  ) +
+  geom_step(aes(x = seq(-0.45, 7 * 1, 1),
+                y = c(0, cumsum(
+                  table(s6_small$S6_rel)
+                ), 1200) / 2), color = 'red', size = 1) +
+  scale_y_continuous("Frequency",
+                     sec.axis = sec_axis(~ . * 2, name = "Cumulative  Frequency")) + scale_x_discrete(name ="Score")
+```
+
+
+```{r}
+ggplot() +
+  geom_bar(
+    data = as.data.frame(table(s100_small$S100_rel)),
+    aes(x = Var1, y = Freq),
+    stat = "identity",
+    color = "black",
+    fill = "skyblue",
+    alpha = 0.9
+  ) +
+  geom_step(aes(x = seq(-0.45, 100 * 1, 1),
+                y = c(0, cumsum(
+                  table(s100_small$S100_rel)
+                ), 1200) / 4), color = 'red', size = 1) +
+  scale_y_continuous("Frequency",
+                     sec.axis = sec_axis( ~ . * 4, name = "Cumulative  Frequency")) + scale_x_discrete(name ="Score", breaks = seq(0, 100, by = 10)) 
+```
+
+# Distribution of score aggregated by mean
+```{r}
+s6_mean = aggregate(S6_rel~doc_id,s6_small,mean)
+s6_mean$rel = aggregate(rel~doc_id,s6_small, FUN=head, 1)$rel
+
+s100_mean = aggregate(S100_rel~doc_id,s100_small,mean)
+s100_mean$rel = aggregate(rel~doc_id,s100_small, FUN=head, 1)$rel
+```
+
+
+
+```{r}
+x = cumsum(hist(s6_mean$S6_rel, breaks = 6)$counts)
+ggplot() +
+  geom_histogram(
+    data = s6_mean,
+    aes(S6_rel),
+    color = "black",
+    fill = "skyblue",
+    bins = 200
+  ) +
+  geom_step(aes(x = seq(1, 6 * 1, 1),
+                y = c(x, 120) / 15), color = 'red', size = 1) +
+  scale_y_continuous("Frequency",
+                     sec.axis = sec_axis( ~ . * 15, name = "Cumulative  Frequency")) + scale_x_discrete(name ="Score")
+```
+
+
+```{r}
+
+
+ggplot() +
+  geom_histogram(
+    data = s100_mean,
+    aes(S100_rel),
+    color = "black",
+    fill = "skyblue",
+    bins = 200
+  ) + scale_x_discrete(name = "Score")
+
+```
+
+# Crowd vs Expert
+
+
+```{r}
+
+ggplot(s6_mean, aes(x=reorder(rel,S6_rel,na.rm = TRUE), y=S6_rel)) + 
+  geom_boxplot(color="black", fill="skyblue", alpha=0.9)+
+  geom_jitter(alpha=0.7) + scale_x_discrete(name = "Ground Truth")
+
+
+ggplot(s100_mean, aes(x=reorder(rel,S100_rel,na.rm = TRUE), y=S100_rel)) + 
+  geom_boxplot(color="black", fill="skyblue", alpha=0.9)+
+  geom_jitter()+ scale_x_discrete(name = "Ground Truth")
+```
+
+
+## Comparison with ground truth for Dem workers (blue) and Rep workers (red):
+```{r}
+s6_rep <-
+  aggregate(S6_rel ~ doc_id, s6_small[s6_small$party_ln == 1, ], mean)
+s6_rep$rel <-
+  aggregate(rel ~ doc_id, s6_small[s6_small$party_ln == 1, ], FUN = head, 1)$rel
+s6_rep$doc_party <- substring(s6_rep$doc_id, 1, 3)
+rep_dem <- rep("REP", nrow(s6_rep))
+s6_rep <- cbind(s6_rep, rep_dem)
+
+s6_dem <-
+  aggregate(S6_rel ~ doc_id, s6_small[s6_small$party_ln == 2, ], mean)
+s6_dem$rel <-
+  aggregate(rel ~ doc_id, s6_small[s6_small$party_ln == 2, ], FUN = head, 1)$rel
+s6_dem$doc_party <- substring(s6_dem$doc_id, 1, 3)
+rep_dem <- rep("DEM", nrow(s6_dem))
+s6_dem <- cbind(s6_dem, rep_dem)
+s6_rep_dem <- rbind(s6_dem, s6_rep)
+
+s100_rep <-
+  aggregate(S100_rel ~ doc_id, s100_small[s100_small$party_ln == 1, ], mean)
+s100_rep$rel <-
+  aggregate(rel ~ doc_id, s100_small[s100_small$party_ln == 1, ], FUN = head, 1)$rel
+s100_rep$doc_party <- substring(s100_rep$doc_id, 1, 3)
+rep_dem <- rep("REP", nrow(s100_rep))
+s100_rep <- cbind(s100_rep, rep_dem)
+
+s100_dem <-
+  aggregate(S100_rel ~ doc_id, s100_small[s100_small$party_ln == 2, ], mean)
+s100_dem$rel <-
+  aggregate(rel ~ doc_id, s100_small[s100_small$party_ln == 2, ], FUN = head, 1)$rel
+s100_dem$doc_party <- substring(s100_dem$doc_id, 1, 3)
+rep_dem <- rep("DEM", nrow(s100_dem))
+s100_dem <- cbind(s100_dem, rep_dem)
+s100_rep_dem <- rbind(s100_dem, s100_rep)
+
+
+
+#s6_rep_dem$fromparty <- substring(s6_rep_dem$doc_id,1,3)
+ggplot(s6_rep_dem, aes(
+  x = reorder(rel, S6_rel, na.rm = TRUE),
+  y = S6_rel,
+  fill = rep_dem
+)) +
+  geom_boxplot() +
+  geom_point(pch = 21, position = position_jitterdodge())
+
+ggplot(s6_rep_dem[s6_rep_dem$doc_party == "REP", ], aes(
+  x = reorder(rel, S6_rel, na.rm = TRUE),
+  y = S6_rel,
+  fill = rep_dem
+)) +
+  geom_boxplot() +
+  geom_point(pch = 21, position = position_jitterdodge())
+
+
+ggplot(s6_rep_dem[s6_rep_dem$doc_party == "DEM", ], aes(
+  x = reorder(rel, S6_rel, na.rm = TRUE),
+  y = S6_rel,
+  fill = rep_dem
+)) +
+  geom_boxplot() +
+  geom_point(pch = 21, position = position_jitterdodge()) +
+  scale_fill_manual(name = "Worker Party", values = c("skyblue", "tomato1")) +
+  ylab("Score") + xlab("Ground Truth")
+
+
+
+ggplot(s100_rep_dem, aes(
+  x = reorder(rel, S100_rel, na.rm = TRUE),
+  y = S100_rel,
+  fill = rep_dem
+)) +
+  geom_boxplot() +
+  geom_point(pch = 21, position = position_jitterdodge())
+ggplot(s100_rep_dem[s100_rep_dem$doc_party == "REP", ], aes(
+  x = reorder(rel, S100_rel, na.rm = TRUE),
+  y = S100_rel,
+  fill = rep_dem
+)) +
+  geom_boxplot() +
+  geom_point(pch = 21, position = position_jitterdodge())
+ggplot(s100_rep_dem[s100_rep_dem$doc_party == "DEM", ], aes(
+  x = reorder(rel, S100_rel, na.rm = TRUE),
+  y = S100_rel,
+  fill = rep_dem
+)) +
+  geom_boxplot() +
+  geom_point(pch = 21, position = position_jitterdodge())
+
+
+```
+### comparing  mean values
+
+Here there are some difference to the original paper.
+```{r}
+print("Demokrats on Dem Speakers")
+mean(s100_dem$S100_rel[s100_dem$rel=='TRUE' & s100_dem$doc_party=='DEM'])
+mean(s6_dem$S6_rel[s6_dem$rel=='TRUE' & s6_dem$doc_party=='DEM'])
+print("Demokrats on Rep Speakers")
+mean(s100_dem$S100_rel[s100_dem$rel=='TRUE' & s100_dem$doc_party=='REP'])
+mean(s6_dem$S6_rel[s6_dem$rel=='TRUE' & s6_dem$doc_party=='REP'])
+
+
+print("Republicans on Dem Speakers")
+mean(s100_rep$S100_rel[s100_rep$rel=='TRUE' & s100_rep$doc_party=='DEM'])
+mean(s6_rep$S6_rel[s6_rep$rel=='TRUE' & s6_rep$doc_party=='DEM'])
+print("Republicans on Rep Speakers")
+mean(s100_rep$S100_rel[s100_rep$rel=='TRUE' & s100_rep$doc_party=='REP'])
+mean(s6_rep$S6_rel[s6_rep$rel=='TRUE' & s6_rep$doc_party=='REP'])
+```
+
+# Testing
+```{r}
+target <- c("LIE", "FALSE", "BARELYTRUE", "HALFTRUE", "MOSTLYTRUE", "TRUE")
+s6_small$rel_int = as.numeric(as.character(factor(s6_small$rel, levels= target, labels=c(1,2,3,4,5,6))))
+s100_small$rel_int = as.numeric(as.character(factor(s100_small$rel, levels= target, labels=c(1,2,3,4,5,6))))
+```
+
+## s6
+A t-test comparing crowd assessor scores across expert judgment levels shows that crowd scores are significantly different (p<0.01) across all levels except for the class combinations Lie–False, False–Barely True, and Mostly True–True.
+
+```{r}
+ground_truth = c("LIE", "FALSE", "BARELYTRUE", "HALFTRUE", "MOSTLYTRUE", "TRUE")
+
+testing_s6 <- function(group1, group2) {
+  print(paste(c("Testing ", group1, '-', group2), collapse = " "))
+  
+  t.test(
+    s6_small$S6_rel[s6_small$rel == group1],
+    paired = FALSE,
+    y = s6_small$S6_rel[s6_small$rel == group2],
+    alternative = c("two.sided"),
+  )$p.value
+  
+}
+
+testing_s6(ground_truth[1],ground_truth[2])
+testing_s6(ground_truth[2],ground_truth[3])
+testing_s6(ground_truth[3],ground_truth[4])
+testing_s6(ground_truth[4],ground_truth[5])
+testing_s6(ground_truth[5],ground_truth[6])
+testing_s6(ground_truth[4],ground_truth[2])
+testing_s6(ground_truth[1],ground_truth[3])
+
+
+```
+## s100
+
+```{r}
+
+testing_s100 <- function(group1, group2) {
+  print(paste(c("Testing ", group1, '-', group2), collapse = " "))
+  
+  t.test(
+    s100_small$S100_rel[s100_small$rel == group1],
+    y = s100_small$S100_rel[s100_small$rel == group2],
+    alternative = c("two.sided"),
+    mu = 0,
+    conf.level = 0.95
+  )$p.value
+  
+}
+
+testing_s100(ground_truth[1],ground_truth[2])
+testing_s100(ground_truth[2],ground_truth[3])
+testing_s100(ground_truth[3],ground_truth[4])
+testing_s100(ground_truth[4],ground_truth[5])
+testing_s100(ground_truth[5],ground_truth[6])
+testing_s100(ground_truth[4],ground_truth[2])
+testing_s100(ground_truth[1],ground_truth[3])
+testing_s100(ground_truth[1],ground_truth[4])
+```
+
+
+
+# Difference concerning bias based decisions
+
+"We can see that crowd assessors who voted for the Rep party tend to assign higher truthfulness scores, especially for the Lie and False ground truth labels, showing how, on average, they believe to content more than crowd assessors who voted for the Dem party."
+ When testing this hypotheses we see that there is in fact no significant difference between assessors who voted for the Rep party and those who voted for the Dem party.
+```{r}
+s6_small$party_ln = as.factor(s6_small$party_ln)
+
+ggplot(s6_rep_dem[s6_rep_dem$rel=="LIE",], aes(x=rep_dem,y=S6_rel))+
+  geom_boxplot(color = "black",
+               fill = "skyblue",
+               alpha = 0.9) + scale_x_discrete(name = "LIE")
+
+ggplot(s6_rep_dem[s6_rep_dem$rel=="FALSE",], aes(x=rep_dem,y=S6_rel))+
+  geom_boxplot(color = "black",
+               fill = "skyblue",
+               alpha = 0.9) + scale_x_discrete(name = "FALSE")
+
+
+data1 = s6_rep_dem$S6_rel[s6_rep_dem$rel == 'LIE' &
+                            s6_rep_dem$rep_dem == 'DEM']
+data2 = s6_rep_dem$S6_rel[s6_rep_dem$rel == 'LIE' &
+                            s6_rep_dem$rep_dem == 'REP']
+t.test(
+  data1,
+  data2,
+  alternative = c("two.sided"),
+  paired = FALSE,
+  var.equal = TRUE,
+  conf.level = 0.95
+)$p.value
+
+data1 = s6_rep_dem$S6_rel[s6_rep_dem$rel == 'FALSE' &
+                            s6_rep_dem$rep_dem == 'DEM']
+data2 = s6_rep_dem$S6_rel[s6_rep_dem$rel == 'FALSE' &
+                            s6_rep_dem$rep_dem == 'REP']
+t.test(
+  data1,
+  data2,
+  alternative = c("two.sided"),
+  paired = FALSE,
+  var.equal = TRUE,
+  conf.level = 0.95
+)$p.value
+```
+
+
+When comparing how crowd workers assess statements differently based on who the speaker is, we can observe that True statements obtain higher scores from crowd assessors who voted for the speaker’s party. BUT -> No significant difference
+```{r}
+ggplot(s6_rep_dem[s6_rep_dem$rel == 'TRUE' &
+                    s6_rep_dem$doc_party == "DEM", ], aes(x = rep_dem, y = S6_rel)) +
+  geom_boxplot(color = "black",
+               fill = "skyblue",
+               alpha = 0.9)
+
+t.test(
+  s6_rep_dem$S6_rel[s6_rep_dem$rel == 'TRUE' &
+                      s6_rep_dem$doc_party == "DEM" & s6_rep_dem$rep_dem == 'DEM'],
+  s6_rep_dem$S6_rel[s6_rep_dem$rel == 'TRUE' &
+                      s6_rep_dem$doc_party == "DEM" & s6_rep_dem$rep_dem == 'REP'],
+  alternative = c("two.sided"),
+  paired = FALSE,
+  var.equal = TRUE,
+  conf.level = 0.95
+)$p.value
+```
+#Additional
+
+## Correctness compared to time
+In this test we are checking if there is a significant difference between the correctness of the crowd assessors and the time taken to rate a statement.
+The p.value is 0.09183 (>0.01) so there is no significant difference
+```{r}
+
+s6_small$correct = s6_small$S6_rel == s6_small$rel_int
+
+ggplot(s6_small, aes(x = correct, y = time)) +
+  geom_boxplot(color = "black",
+               fill = "skyblue",
+               alpha = 0.9)
+
+t.test(
+  s6_small$time[s6_small$correct == TRUE],
+  y = s6_small$time[s6_small$correct == FALSE],
+  alternative = c("two.sided"),
+  mu = 0,
+  conf.level = 0.95
+)
+```
+```{r}
+
+s6_small$close =( s6_small$S6_rel >= s6_small$rel_int-1)& ( s6_small$S6_rel <= s6_small$rel_int+1) 
+
+ggplot(s6_small, aes(x = close, y = time)) +
+  geom_boxplot(color = "black",
+               fill = "skyblue",
+               alpha = 0.9)
+
+t.test(
+  s6_small$time[s6_small$close == TRUE],
+  y = s6_small$time[s6_small$close == FALSE],
+  alternative = c("two.sided"),
+  mu = 0,
+  conf.level = 0.95
+)
+## Gender
+
+```
+
+```{r}
+s6_gender1 <-
+  aggregate(S6_rel ~ doc_id, s6_small[s6_small$gender == 1, ], mean)
+s6_gender1$rel <-
+  aggregate(rel ~ doc_id, s6_small[s6_small$gender == 1, ], FUN = head, 1)$rel
+
+s6_gender1$gender = '1'
+
+s6_gender2 <-
+  aggregate(S6_rel ~ doc_id, s6_small[s6_small$gender == 2, ], mean)
+s6_gender2$rel <-
+  aggregate(rel ~ doc_id, s6_small[s6_small$gender == 2, ], FUN = head, 1)$rel
+s6_gender2$gender = '2'
+
+s6_gender <- rbind(s6_gender1, s6_gender2)
+
+```
+
+
+```{r}
+ggplot(s6_gender, aes(
+  x = reorder(rel, S6_rel, na.rm = TRUE),
+  y = S6_rel,
+  fill = gender
+)) +
+  geom_boxplot()+
+  ylab("Score") + xlab("Ground Truth")+
+  scale_fill_manual(name = "Gender", values = c("skyblue", "tomato1"))
+```
+```{r}
+testing_gender_s6 <- function(group1, group2,ge) {
+  print(paste(c("Testing ", group1, '-', group2), collapse = " "))
+  
+  t.test(
+    s6_gender$S6_rel[s6_gender$rel == group1 & s6_gender$gender==ge],
+    y = s6_small$S6_rel[s6_gender$rel == group2 & s6_gender$gender==ge],
+    alternative = c("two.sided"),
+    mu = 0,
+    conf.level = 0.95
+  )$p.value
+  
+}
+```
+```{r}
+testing_gender_s6(ground_truth[1],ground_truth[2],'1')
+testing_gender_s6(ground_truth[2],ground_truth[3],'1')
+testing_gender_s6(ground_truth[3],ground_truth[4],'1')
+testing_gender_s6(ground_truth[4],ground_truth[5],'1')
+testing_gender_s6(ground_truth[5],ground_truth[6],'1')
+
+```
+```{r}
+testing_gender_s6(ground_truth[1],ground_truth[2],'2')
+testing_gender_s6(ground_truth[2],ground_truth[3],'2')
+testing_gender_s6(ground_truth[3],ground_truth[4],'2')
+testing_gender_s6(ground_truth[4],ground_truth[5],'2')
+testing_gender_s6(ground_truth[5],ground_truth[6],'2')
+testing_gender_s6(ground_truth[4],ground_truth[2],'2')
+testing_gender_s6(ground_truth[1],ground_truth[3],'2')
+```
+
+```{r}
+s100_gender1 <-
+  aggregate(S100_rel ~ doc_id, s100_small[s100_small$gender == 1, ], mean)
+s100_gender1$rel <-
+  aggregate(rel ~ doc_id, s100_small[s100_small$gender == 1, ], FUN = head, 1)$rel
+
+s100_gender1$gender = '1'
+
+s100_gender2 <-
+  aggregate(S100_rel ~ doc_id, s100_small[s100_small$gender == 2, ], mean)
+s100_gender2$rel <-
+  aggregate(rel ~ doc_id, s100_small[s100_small$gender == 2, ], FUN = head, 1)$rel
+s100_gender2$gender = '2'
+
+s100_gender <- rbind(s100_gender1, s100_gender2)
+
+```
+
+
+```{r}
+ggplot(s100_gender, aes(
+  x = reorder(rel, S100_rel, na.rm = TRUE),
+  y = S100_rel,
+  fill = gender
+)) +
+  geom_boxplot()+
+  ylab("Score") + xlab("Ground Truth")
+```
+
+```{r}
+testing_gender_s100 <- function(group1, group2,gender) {
+  print(paste(c("Testing ", group1, '-', group2), collapse = " "))
+  
+  t.test(
+    s100_small$S100_rel[s100_small$rel == group1],
+    y = s100_small$S100_rel[s100_small$rel == group2],
+    alternative = c("two.sided"),
+    mu = 0,
+    conf.level = 0.95
+  )$p.value
+  
+}
+```
+
